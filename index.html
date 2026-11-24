@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador de Partida - Piper Cherokee / EMB-712 Tupi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0b0d10;
+            color: #e2e8f0;
+            user-select: none;
+            overflow-x: hidden;
+        }
+
+        /* Cockpit Metal Panel Texture */
+        .cockpit-panel {
+            background: linear-gradient(145deg, #1e232d 0%, #11141a 60%, #090b0e 100%);
+            box-shadow: inset 0 0 80px rgba(0,0,0,0.95), 0 15px 35px rgba(0,0,0,0.9);
+            border: 3px solid #282f3d;
+        }
+
+        .section-box {
+            background: rgba(13, 16, 23, 0.75);
+            border: 2px solid #232936;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.8), 0 4px 6px rgba(0,0,0,0.4);
+        }
+
+        /* Gauge Housing */
+        .instrument-housing {
+            background: radial-gradient(circle at 35% 35%, #2a303c, #0f1217);
+            box-shadow: 0 8px 12px rgba(0, 0, 0, 0.8), inset 0 2px 3px rgba(255, 255, 255, 0.15), inset 0 -3px 5px rgba(0, 0, 0, 0.9);
+            border: 3px solid #181c24;
+            border-radius: 50%;
+        }
+
+        /* Aircraft Switches */
+        .switch-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .switch-toggle {
+            appearance: none;
+            width: 42px;
+            height: 76px;
+            background: #15181e;
+            border-radius: 8px;
+            position: relative;
+            cursor: pointer;
+            border: 2px solid #333a48;
+            box-shadow: 0 6px 8px rgba(0,0,0,0.7), inset 0 2px 4px rgba(0,0,0,0.8);
+            transition: all 0.1s ease;
+        }
+
+        .switch-toggle::before {
+            content: '';
+            position: absolute;
+            top: 7px;
+            left: 6px;
+            width: 26px;
+            height: 30px;
+            background: linear-gradient(to bottom, #e5e7eb, #9ca3af);
+            border-radius: 5px;
+            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 3px 5px rgba(0,0,0,0.6);
+        }
+
+        .switch-toggle:checked::before {
+            top: 35px;
+        }
+
+        /* Color variants */
+        .switch-red:checked::before {
+            background: linear-gradient(to bottom, #ef4444, #991b1b);
+        }
+        .switch-amber:checked::before {
+            background: linear-gradient(to bottom, #f59e0b, #b45309);
+        }
+        .switch-white:checked::before {
+            background: linear-gradient(to bottom, #ffffff, #9ca3af);
+        }
+
+        /* Ignition Knob */
+        .ignition-knob {
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+            transform-origin: center;
+        }
+
+        /* Levers (Throttle & Mixture) */
+        .lever-track {
+            background: #0a0c0e;
+            border: 2px solid #222733;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.9);
+            border-radius: 12px;
+        }
+
+        .lever-input {
+            writing-mode: bt-lr;
+            -webkit-appearance: slider-vertical;
+            width: 32px;
+            height: 170px;
+            background: transparent;
+            cursor: pointer;
+        }
+
+        /* Annunciator Panel Lights */
+        .annunciator-light {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid #1e293b;
+            background: #0f172a;
+            color: #334155;
+            text-align: center;
+            transition: all 0.2s ease;
+        }
+
+        .annunciator-red-on {
+            background: #7f1d1d !important;
+            color: #fca5a5 !important;
+            border-color: #ef4444 !important;
+            box-shadow: 0 0 12px rgba(239, 68, 68, 0.6);
+        }
+
+        .annunciator-amber-on {
+            background: #78350f !important;
+            color: #fde047 !important;
+            border-color: #f59e0b !important;
+            box-shadow: 0 0 12px rgba(245, 158, 11, 0.6);
+        }
+
+        /* External Lights Visual Feedback Effects */
+        .strobe-flash {
+            animation: strobePulse 1.2s infinite;
+        }
+        @keyframes strobePulse {
+            0%, 90%, 100% { opacity: 0.1; filter: drop-shadow(0 0 0px transparent); }
+            92% { opacity: 1; filter: drop-shadow(0 0 15px #fff); }
+            95% { opacity: 0.2; }
+            97% { opacity: 1; filter: drop-shadow(0 0 20px #fff); }
+        }
+
+        .beacon-pulse {
+            animation: beaconGlow 1.5s infinite ease-in-out;
+        }
+        @keyframes beaconGlow {
+            0%, 100% { opacity: 0.2; transform: scale(0.95); }
+            50% { opacity: 1; transform: scale(1.1); filter: drop-shadow(0 0 12px #ef4444); }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between p-3 md:p-6">
+
+    <!-- HEADER / BANNER -->
+    <header class="flex flex-wrap justify-between items-center bg-slate-900 border border-slate-800 rounded-xl p-4 mb-4 shadow-xl">
+        <div class="flex items-center space-x-3">
+            <div class="bg-red-600 text-white font-extrabold text-xs px-2.5 py-1 rounded tracking-wider shadow">PIPER AIRCRAFT</div>
+            <div>
+                <h1 class="font-bold text-lg md:text-xl text-slate-100 tracking-tight flex items-center gap-2">
+                    SIMULADOR DE PARTIDA DO MOTOR
+                    <span class="text-xs font-semibold text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded bg-amber-500/10">EMB-712 TUPI / ARCHER II</span>
+                </h1>
+                <p class="text-xs text-slate-400">Motor Lycoming O-360-A4M (180 HP) • Procedimento de Partida Realista</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3 mt-3 sm:mt-0">
+            <button id="audioInitBtn" onclick="initAudio()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-bold shadow-lg flex items-center gap-2 text-xs transition transform active:scale-95">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path></svg>
+                <span>SISTEMA DE ÁUDIO</span>
+            </button>
+            <button onclick="resetSimulator()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-2 rounded-lg text-xs font-semibold shadow transition">
+                Resetar Painel
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN COCKPIT WORKSPACE -->
+    <main class="cockpit-panel rounded-2xl p-4 md:p-6 flex-1 flex flex-col justify-between gap-6">
+
+        <!-- TOP SECTION: INSTRUMENT CLUSTER & EXTERNAL LIGHTS VISUALIZER -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+            
+            <!-- ANNUNCIATOR PANEL & STATUS (3 cols) -->
+            <div class="lg:col-span-3 section-box p-4 rounded-xl flex flex-col gap-3">
+                <div class="text-center text-xs font-bold text-slate-400 border-b border-slate-800 pb-2 tracking-wider">
+                    PAINEL ANUNCIADOR (AVISOS)
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div id="ann-volts" class="annunciator-light annunciator-red-on">LOW VOLTS</div>
+                    <div id="ann-oil" class="annunciator-light annunciator-red-on">OIL PRESS</div>
+                    <div id="ann-fuel" class="annunciator-light annunciator-amber-on">FUEL PRESS</div>
+                    <div id="ann-alt" class="annunciator-light">ALT INOP</div>
+                </div>
+
+                <!-- EXTERNAL LIGHTS FEEDBACK VISUALIZER -->
+                <div class="mt-2 pt-3 border-t border-slate-800 flex flex-col gap-2">
+                    <span class="text-[10px] text-center font-bold text-slate-400">LUZES EXTERNAS (VISUALIZADOR)</span>
+                    <div class="flex justify-around items-center bg-slate-950 p-2.5 rounded-lg border border-slate-800">
+                        <!-- Beacon -->
+                        <div class="flex flex-col items-center">
+                            <div id="vis-beacon" class="w-5 h-5 rounded-full bg-red-950 border border-red-800 transition"></div>
+                            <span class="text-[9px] text-slate-500 mt-1">BEACON</span>
+                        </div>
+                        <!-- Strobe -->
+                        <div class="flex flex-col items-center">
+                            <div id="vis-strobe" class="w-5 h-5 rounded-full bg-slate-800 border border-slate-600 transition"></div>
+                            <span class="text-[9px] text-slate-500 mt-1">STROBE</span>
+                        </div>
+                        <!-- Nav Left -->
+                        <div class="flex flex-col items-center">
+                            <div id="vis-nav-l" class="w-4 h-4 rounded-full bg-red-950 transition"></div>
+                            <span class="text-[9px] text-slate-500 mt-1">NAV (Esq)</span>
+                        </div>
+                        <!-- Nav Right -->
+                        <div class="flex flex-col items-center">
+                            <div id="vis-nav-r" class="w-4 h-4 rounded-full bg-emerald-950 transition"></div>
+                            <span class="text-[9px] text-slate-500 mt-1">NAV (Dir)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- GAUGES: TACHOMETER (RPM) & VOLTMETER / PRESSURES (6 cols) -->
+            <div class="lg:col-span-6 flex flex-wrap justify-center items-center gap-6 bg-slate-950/60 p-5 rounded-xl border border-slate-800">
+                
+                <!-- TACHOMETER (RPM) -->
+                <div class="flex flex-col items-center">
+                    <span class="text-xs font-bold text-slate-300 mb-1 tracking-wider">TACÔMETRO (RPM)</span>
+                    <div class="instrument-housing w-44 h-44 p-2 relative">
+                        <svg class="w-full h-full" viewBox="0 0 200 200">
+                            <circle cx="100" cy="100" r="90" fill="#0b0e14"/>
+                            
+                            <!-- Scale Marks -->
+                            <path d="M 40,150 A 75,75 0 1,1 160,150" fill="none" stroke="#334155" stroke-width="8"/>
+                            <path d="M 60,140 A 75,75 0 0,1 135,50" fill="none" stroke="#22c55e" stroke-width="8"/> <!-- Green Arc -->
+                            <path d="M 135,50 A 75,75 0 0,1 160,150" fill="none" stroke="#ef4444" stroke-width="8" stroke-dasharray="4 2"/> <!-- Red Arc -->
+
+                            <!-- Labels -->
+                            <text x="100" y="70" text-anchor="middle" font-family="'Orbitron', sans-serif" font-size="10" fill="#94a3b8">RPM</text>
+                            <text x="100" y="85" text-anchor="middle" font-size="8" fill="#64748b">x 100</text>
+                            
+                            <text x="45" y="145" font-size="12" fill="#fff" font-weight="bold">5</text>
+                            <text x="35" y="105" font-size="12" fill="#fff" font-weight="bold">10</text>
+                            <text x="50" y="65" font-size="12" fill="#fff" font-weight="bold">15</text>
+                            <text x="95" y="45" font-size="12" fill="#fff" font-weight="bold">20</text>
+                            <text x="140" y="65" font-size="12" fill="#fff" font-weight="bold">25</text>
+                            <text x="155" y="110" font-size="12" fill="#ef4444" font-weight="bold">30</text>
+
+                            <!-- Needle -->
+                            <g id="needle-rpm" transform="rotate(-120 100 100)" class="transition-transform duration-75">
+                                <polygon points="97,100 100,22 103,100" fill="#ef4444"/>
+                                <circle cx="100" cy="100" r="10" fill="#1e293b" stroke="#64748b" stroke-width="2"/>
+                            </g>
+                        </svg>
+                    </div>
+                    <span id="digital-rpm" class="mt-2 font-mono text-sm text-emerald-400 font-bold bg-slate-900 px-3 py-0.5 rounded border border-slate-800">0000 RPM</span>
+                </div>
+
+                <!-- VOLTMETER & ENGINE PRESSURES -->
+                <div class="flex flex-col items-center">
+                    <span class="text-xs font-bold text-slate-300 mb-1 tracking-wider">SISTEMA ELETR/PRESSÃO</span>
+                    <div class="instrument-housing w-44 h-44 p-2 relative">
+                        <svg class="w-full h-full" viewBox="0 0 200 200">
+                            <circle cx="100" cy="100" r="90" fill="#0b0e14"/>
+                            
+                            <text x="100" y="55" text-anchor="middle" font-size="9" fill="#94a3b8" font-weight="bold">VOLTS</text>
+                            <path d="M 40,110 A 65,65 0 0,1 160,110" fill="none" stroke="#334155" stroke-width="5"/>
+                            <path d="M 80,68 A 65,65 0 0,1 145,85" fill="none" stroke="#22c55e" stroke-width="5"/>
+
+                            <text x="45" y="125" font-size="9" fill="#aaa">10</text>
+                            <text x="100" y="80" font-size="9" fill="#aaa">14</text>
+                            <text x="145" y="125" font-size="9" fill="#aaa">16</text>
+
+                            <!-- Volts Needle -->
+                            <g id="needle-volts" transform="rotate(-60 100 100)">
+                                <line x1="100" y1="100" x2="100" y2="45" stroke="#f59e0b" stroke-width="3"/>
+                                <circle cx="100" cy="100" r="6" fill="#334155"/>
+                            </g>
+
+                            <!-- Fuel Press Gauge at Bottom -->
+                            <text x="100" y="170" text-anchor="middle" font-size="9" fill="#94a3b8" font-weight="bold">PRESS COMB (PSI)</text>
+                            <path d="M 50,155 Q 100,135 150,155" fill="none" stroke="#334155" stroke-width="4"/>
+                            <path d="M 75,147 Q 100,138 135,148" fill="none" stroke="#22c55e" stroke-width="4"/>
+
+                            <g id="needle-fuelpress" transform="rotate(-40 100 150)">
+                                <line x1="100" y1="150" x2="100" y2="125" stroke="#38bdf8" stroke-width="2.5"/>
+                                <circle cx="100" cy="150" r="4" fill="#1e293b"/>
+                            </g>
+                        </svg>
+                    </div>
+                    <span id="digital-volts" class="mt-2 font-mono text-sm text-amber-400 font-bold bg-slate-900 px-3 py-0.5 rounded border border-slate-800">0.0 V</span>
+                </div>
+
+            </div>
+
+            <!-- STARTUP CHECKLIST GUIDANCE (3 cols) -->
+            <div class="lg:col-span-3 section-box p-4 rounded-xl flex flex-col justify-between h-full">
+                <div class="text-center text-xs font-bold text-amber-400 border-b border-slate-800 pb-2 tracking-wider">
+                    PASSO A PASSO DA PARTIDA
+                </div>
+                <ol id="checklist-ui" class="text-xs space-y-2 my-2 text-slate-300">
+                    <li id="chk-1" class="flex items-center gap-2 text-amber-300 font-semibold">
+                        <span class="w-4 h-4 rounded-full bg-amber-500/20 border border-amber-500 flex items-center justify-center text-[10px]">1</span>
+                        <span>Master Switch ➔ ON</span>
+                    </li>
+                    <li id="chk-2" class="flex items-center gap-2 opacity-60">
+                        <span class="w-4 h-4 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-[10px]">2</span>
+                        <span>Alternador ➔ ON</span>
+                    </li>
+                    <li id="chk-3" class="flex items-center gap-2 opacity-60">
+                        <span class="w-4 h-4 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-[10px]">3</span>
+                        <span>Luzes Nav & Beacon ➔ ON</span>
+                    </li>
+                    <li id="chk-4" class="flex items-center gap-2 opacity-60">
+                        <span class="w-4 h-4 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-[10px]">4</span>
+                        <span>Bomba Combustível ➔ ON</span>
+                    </li>
+                    <li id="chk-5" class="flex items-center gap-2 opacity-60">
+                        <span class="w-4 h-4 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-[10px]">5</span>
+                        <span>Mistura ➔ RICA (Avançada)</span>
+                    </li>
+                    <li id="chk-6" class="flex items-center gap-2 opacity-60">
+                        <span class="w-4 h-4 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-[10px]">6</span>
+                        <span>Potência ➔ ~10% (Lenta)</span>
+                    </li>
+                    <li id="chk-7" class="flex items-center gap-2 opacity-60">
+                        <span class="w-4 h-4 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-[10px]">7</span>
+                        <span>Ignição ➔ Dar START</span>
+                    </li>
+                </ol>
+                <div id="status-banner" class="bg-slate-900 border border-slate-800 p-2 rounded text-center text-[11px] font-semibold text-slate-400">
+                    Aguardando início do procedimento...
+                </div>
+            </div>
+
+        </div>
+
+        <!-- LOWER SECTION: SWITCH PANEL, IGNITION & CONTROL LEVERS -->
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-6 bg-slate-950/90 p-5 rounded-2xl border border-slate-800 shadow-2xl">
+            
+            <!-- 1. ELECTRICAL SWITCHES (5 cols) -->
+            <div class="md:col-span-5 flex flex-wrap items-center justify-around gap-3 border-r border-slate-800/80 pr-4">
+                
+                <!-- Master Battery -->
+                <div class="switch-wrapper">
+                    <span class="text-[10px] font-extrabold text-red-400 mb-1">MASTER</span>
+                    <input type="checkbox" id="sw-master" onchange="handleSwitch('master')" class="switch-toggle switch-red">
+                    <span class="text-[9px] font-bold text-slate-400 mt-1">BAT</span>
+                </div>
+
+                <!-- Alternator -->
+                <div class="switch-wrapper">
+                    <span class="text-[10px] font-extrabold text-amber-400 mb-1">ALT</span>
+                    <input type="checkbox" id="sw-alt" onchange="handleSwitch('alt')" class="switch-toggle switch-amber">
+                    <span class="text-[9px] font-bold text-slate-400 mt-1">ALT</span>
+                </div>
+
+                <!-- Fuel Pump -->
+                <div class="switch-wrapper">
+                    <span class="text-[10px] font-extrabold text-red-400 mb-1">BOMBA</span>
+                    <input type="checkbox" id="sw-fuelpump" onchange="handleSwitch('fuelpump')" class="switch-toggle switch-red">
+                    <span class="text-[9px] font-bold text-slate-400 mt-1">FUEL PUMP</span>
+                </div>
+
+                <!-- Beacon -->
+                <div class="switch-wrapper">
+                    <span class="text-[10px] font-bold text-slate-300 mb-1">BEACON</span>
+                    <input type="checkbox" id="sw-beacon" onchange="handleSwitch('beacon')" class="switch-toggle switch-white">
+                    <span class="text-[9px] font-bold text-slate-400 mt-1">BCN</span>
+                </div>
+
+                <!-- Strobe -->
+                <div class="switch-wrapper">
+                    <span class="text-[10px] font-bold text-slate-300 mb-1">STROBE</span>
+                    <input type="checkbox" id="sw-strobe" onchange="handleSwitch('strobe')" class="switch-toggle switch-white">
+                    <span class="text-[9px] font-bold text-slate-400 mt-1">STRB</span>
+                </div>
+
+                <!-- Nav Lights -->
+                <div class="switch-wrapper">
+                    <span class="text-[10px] font-bold text-slate-300 mb-1">NAV</span>
+                    <input type="checkbox" id="sw-nav" onchange="handleSwitch('nav')" class="switch-toggle switch-white">
+                    <span class="text-[9px] font-bold text-slate-400 mt-1">LUZES</span>
+                </div>
+
+            </div>
+
+            <!-- 2. IGNITION KEY / MAGNETOS SWITCH (3 cols) -->
+            <div class="md:col-span-3 flex flex-col items-center justify-center border-r border-slate-800/80 px-4">
+                <span class="text-xs font-extrabold text-slate-200 mb-2 tracking-wider">CHAVE DE IGNIÇÃO / MAGNETOS</span>
+                <div class="relative w-32 h-32 flex items-center justify-center bg-slate-900 rounded-full border-4 border-slate-800 shadow-inner">
+                    <!-- Labels -->
+                    <span class="absolute top-2 text-[10px] font-bold text-slate-300">BOTH</span>
+                    <span class="absolute right-2 text-[10px] font-extrabold text-amber-500">START</span>
+                    <span class="absolute left-3 text-[10px] font-bold text-slate-300">L</span>
+                    <span class="absolute bottom-6 left-6 text-[10px] font-bold text-slate-300">R</span>
+                    <span class="absolute bottom-2 text-[10px] font-extrabold text-red-500">OFF</span>
+
+                    <!-- Knob -->
+                    <div id="ignition-knob" class="ignition-knob w-16 h-16 bg-gradient-to-tr from-slate-700 via-slate-500 to-slate-400 rounded-full border-2 border-slate-300 flex items-center justify-center shadow-2xl cursor-pointer">
+                        <div class="w-3.5 h-12 bg-slate-950 rounded shadow-md border-t border-slate-700"></div>
+                    </div>
+                </div>
+
+                <!-- Ignition Step Controls -->
+                <div class="flex items-center gap-2 mt-3">
+                    <button onclick="stepIgnition(-1)" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-xs font-bold border border-slate-700 active:scale-95 transition">◄ VOLTAR</button>
+                    <button onmousedown="startEngineHoldDown()" onmouseup="startEngineRelease()" onmouseleave="startEngineRelease()" class="px-4 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded text-xs font-extrabold shadow-lg active:scale-95 transition tracking-wider">
+                        START (SEGURAR)
+                    </button>
+                </div>
+            </div>
+
+            <!-- 3. THROTTLE & MIXTURE QUADRANT (4 cols) -->
+            <div class="md:col-span-4 flex items-center justify-around pl-4 bg-slate-900/60 p-3 rounded-xl border border-slate-800">
+                
+                <!-- Throttle Lever -->
+                <div class="flex flex-col items-center">
+                    <span class="text-xs font-extrabold text-slate-200">POTÊNCIA</span>
+                    <span class="text-[9px] text-slate-400 mb-2 font-mono">THROTTLE (PRETA)</span>
+                    <div class="lever-track p-2 flex justify-center">
+                        <input type="range" id="lever-throttle" min="0" max="100" value="10" class="lever-input" oninput="handleLeverChange('throttle')">
+                    </div>
+                    <span id="txt-throttle" class="text-xs font-mono text-slate-300 font-bold mt-2">10%</span>
+                </div>
+
+                <!-- Mixture Lever -->
+                <div class="flex flex-col items-center">
+                    <span class="text-xs font-extrabold text-red-400">MISTURA</span>
+                    <span class="text-[9px] text-red-400/80 mb-2 font-mono">MIXTURE (VERMELHA)</span>
+                    <div class="lever-track p-2 flex justify-center border-red-900/40">
+                        <input type="range" id="lever-mixture" min="0" max="100" value="0" class="lever-input" oninput="handleLeverChange('mixture')">
+                    </div>
+                    <span id="txt-mixture" class="text-xs font-mono text-red-400 font-bold mt-2">CORTADA (0%)</span>
+                </div>
+
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="text-center text-xs text-slate-500 mt-4">
+        Simulador de Procedimento de Partida - EMB-712 Tupi / Piper Cherokee • Desenvolvido com HTML5 & Web Audio API
+    </footer>
+
+    <!-- SIMULATOR LOGIC & AUDIO SYNTHESIS -->
+    <script>
+        /* ===================================================================
+           AIRCRAFT & SIMULATOR STATE
+           =================================================================== */
+        const state = {
+            // Switches
+            master: false,
+            alt: false,
+            fuelpump: false,
+            beacon: false,
+            strobe: false,
+            nav: false,
+
+            // Ignition Switch Position: 0: OFF, 1: R, 2: L, 3: BOTH, 4: START
+            ignitionPos: 0,
+            isCranking: false,
+
+            // Levers (0 to 100)
+            throttle: 10,
+            mixture: 0, // Starts CUT-OFF (0) for realism
+
+            // Engine Physics
+            engineRunning: false,
+            rpm: 0,
+            targetRpm: 0,
+            batteryVolts: 0,
+            fuelPressure: 0,
+            oilPressure: 0,
+
+            // Audio system initialized
+            audioInitialized: false
+        };
+
+        const ignitionAngles = [-60, -30, 0, 30, 65];
+
+        /* ===================================================================
+           WEB AUDIO API SYNTHESIZER (NATIVE SOUND GENERATION)
+           =================================================================== */
+        let audioCtx = null;
+        let fuelPumpOsc = null;
+        let fuelPumpGain = null;
+        
+        let starterOsc = null;
+        let starterGain = null;
+
+        let engineOsc1 = null;
+        let engineOsc2 = null;
+        let engineGain = null;
+        let propNoiseSource = null;
+        let propNoiseGain = null;
+
+        function initAudio() {
+            if (audioCtx) return;
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+            state.audioInitialized = true;
+
+            // 1. FUEL PUMP HUM SYNTHESIZER
+            fuelPumpOsc = audioCtx.createOscillator();
+            fuelPumpOsc.type = 'sawtooth';
+            fuelPumpOsc.frequency.setValueAtTime(140, audioCtx.currentTime);
+
+            const pumpFilter = audioCtx.createBiquadFilter();
+            pumpFilter.type = 'lowpass';
+            pumpFilter.frequency.setValueAtTime(450, audioCtx.currentTime);
+
+            fuelPumpGain = audioCtx.createGain();
+            fuelPumpGain.gain.setValueAtTime(0, audioCtx.currentTime);
+
+            fuelPumpOsc.connect(pumpFilter);
+            pumpFilter.connect(fuelPumpGain);
+            fuelPumpGain.connect(audioCtx.destination);
+            fuelPumpOsc.start();
+
+            // 2. STARTER MOTOR CRANK SYNTHESIZER
+            starterOsc = audioCtx.createOscillator();
+            starterOsc.type = 'triangle';
+            starterOsc.frequency.setValueAtTime(45, audioCtx.currentTime);
+
+            starterGain = audioCtx.createGain();
+            starterGain.gain.setValueAtTime(0, audioCtx.currentTime);
+
+            starterOsc.connect(starterGain);
+            starterGain.connect(audioCtx.destination);
+            starterOsc.start();
+
+            // 3. MAIN BOXER ENGINE SYNTHESIZER (Lycoming O-360)
+            engineOsc1 = audioCtx.createOscillator();
+            engineOsc1.type = 'sawtooth';
+            
+            engineOsc2 = audioCtx.type = 'square';
+            engineOsc2 = audioCtx.createOscillator();
+            engineOsc2.type = 'square';
+
+            engineGain = audioCtx.createGain();
+            engineGain.gain.setValueAtTime(0, audioCtx.currentTime);
+
+            // Propeller Wind Noise
+            const bufferSize = audioCtx.sampleRate * 2;
+            const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const output = noiseBuffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                output[i] = Math.random() * 2 - 1;
+            }
+
+            propNoiseSource = audioCtx.createBufferSource();
+            propNoiseSource.buffer = noiseBuffer;
+            propNoiseSource.loop = true;
+
+            const noiseFilter = audioCtx.createBiquadFilter();
+            noiseFilter.type = 'lowpass';
+            noiseFilter.frequency.setValueAtTime(300, audioCtx.currentTime);
+
+            propNoiseGain = audioCtx.createGain();
+            propNoiseGain.gain.setValueAtTime(0, audioCtx.currentTime);
+
+            engineOsc1.connect(engineGain);
+            engineOsc2.connect(engineGain);
+            engineGain.connect(audioCtx.destination);
+
+            propNoiseSource.connect(noiseFilter);
+            noiseFilter.connect(propNoiseGain);
+            propNoiseGain.connect(audioCtx.destination);
+
+            engineOsc1.start();
+            engineOsc2.start();
+            propNoiseSource.start();
+
+            const btn = document.getElementById('audioInitBtn');
+            btn.classList.remove('bg-emerald-600', 'hover:bg-emerald-500');
+            btn.classList.add('bg-slate-700', 'text-emerald-400', 'border', 'border-emerald-500/40');
+            btn.innerHTML = `<span>✓ ÁUDIO ATIVO</span>`;
+        }
+
+        // Mechanical Switch Click Sound
+        function playSwitchClick() {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(120, audioCtx.currentTime + 0.025);
+            gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.025);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.03);
+        }
+
+        // Lever Friction Sound
+        function playLeverSound() {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.04);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.04);
+        }
+
+        // Engine Startup "Catch/Vroom" Sound Effect
+        function playEngineCatchSound() {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(40, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(140, audioCtx.currentTime + 0.4);
+            
+            gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.05, audioCtx.currentTime + 0.5);
+
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.5);
+        }
+
+        /* ===================================================================
+           INTERACTION CONTROLLERS
+           =================================================================== */
+        function handleSwitch(name) {
+            initAudio();
+            playSwitchClick();
+            state[name] = document.getElementById(`sw-${name}`).checked;
+            updateSimulatorLogic();
+        }
+
+        function handleLeverChange(name) {
+            initAudio();
+            playLeverSound();
+            const val = parseInt(document.getElementById(`lever-${name}`).value);
+            state[name] = val;
+
+            if (name === 'throttle') {
+                document.getElementById('txt-throttle').innerText = `${val}%`;
+            } else if (name === 'mixture') {
+                const txt = document.getElementById('txt-mixture');
+                if (val > 70) {
+                    txt.innerText = `RICA (${val}%)`;
+                    txt.className = "text-xs font-mono text-emerald-400 font-bold mt-2";
+                } else if (val > 15) {
+                    txt.innerText = `POBRE (${val}%)`;
+                    txt.className = "text-xs font-mono text-amber-400 font-bold mt-2";
+                } else {
+                    txt.innerText = `CORTADA (${val}%)`;
+                    txt.className = "text-xs font-mono text-red-400 font-bold mt-2";
+                }
+            }
+
+            // Engine cutoff if mixture drops below 10%
+            if (state.mixture < 10 && state.engineRunning) {
+                state.engineRunning = false;
+            }
+
+            updateSimulatorLogic();
+        }
+
+        function stepIgnition(direction) {
+            initAudio();
+            playSwitchClick();
+            state.ignitionPos = Math.max(0, Math.min(3, state.ignitionPos + direction));
+            updateIgnitionKnobUI();
+        }
+
+        function startEngineHoldDown() {
+            initAudio();
+            state.ignitionPos = 4; // START position
+            state.isCranking = true;
+            updateIgnitionKnobUI();
+            checkEngineStartConditions();
+        }
+
+        function startEngineRelease() {
+            if (state.ignitionPos === 4) {
+                state.ignitionPos = state.engineRunning ? 3 : 0; // Both if running, else OFF
+                state.isCranking = false;
+                updateIgnitionKnobUI();
+            }
+        }
+
+        function updateIgnitionKnobUI() {
+            const knob = document.getElementById('ignition-knob');
+            knob.style.transform = `rotate(${ignitionAngles[state.ignitionPos]}deg)`;
+            updateSimulatorLogic();
+        }
+
+        /* ===================================================================
+           ENGINE START & PHYSICS LOGIC
+           =================================================================== */
+        function checkEngineStartConditions() {
+            // Checklist Validation for Engine Start
+            const hasPower = state.master;
+            const isIgnitionStart = (state.ignitionPos === 4);
+            const isMixtureRich = (state.mixture > 50);
+
+            if (hasPower && isIgnitionStart && isMixtureRich) {
+                setTimeout(() => {
+                    if (state.isCranking && !state.engineRunning && state.mixture > 50 && state.master) {
+                        state.engineRunning = true;
+                        playEngineCatchSound();
+                    }
+                }, 900); // Starter cranks for ~0.9s before catching
+            }
+        }
+
+        function updateSimulatorLogic() {
+            // Electrical Voltages
+            if (state.engineRunning && state.alt) {
+                state.batteryVolts = 14.2;
+            } else if (state.master) {
+                state.batteryVolts = state.isCranking ? 10.5 : 12.4;
+            } else {
+                state.batteryVolts = 0;
+            }
+
+            // Fuel Pressure
+            if (state.engineRunning || (state.master && state.fuelpump)) {
+                state.fuelPressure = 5.5; // PSI normal
+            } else {
+                state.fuelPressure = 0;
+            }
+
+            // Oil Pressure
+            if (state.engineRunning) {
+                state.oilPressure = 60;
+            } else {
+                state.oilPressure = 0;
+            }
+
+            // Audio Synthesis Volumes & Frequencies
+            if (audioCtx) {
+                // Fuel Pump Hum
+                if (state.master && state.fuelpump) {
+                    fuelPumpGain.gain.setTargetAtTime(0.12, audioCtx.currentTime, 0.05);
+                } else {
+                    fuelPumpGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.05);
+                }
+
+                // Starter Crank Sound
+                if (state.master && state.isCranking && !state.engineRunning) {
+                    starterGain.gain.setTargetAtTime(0.25, audioCtx.currentTime, 0.05);
+                    starterOsc.frequency.setTargetAtTime(45 + Math.random() * 5, audioCtx.currentTime, 0.05);
+                } else {
+                    starterGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.05);
+                }
+            }
+
+            // Update Annunciator Lights UI
+            const annVolts = document.getElementById('ann-volts');
+            const annOil = document.getElementById('ann-oil');
+            const annFuel = document.getElementById('ann-fuel');
+            const annAlt = document.getElementById('ann-alt');
+
+            if (state.master) {
+                annVolts.className = (state.batteryVolts < 12.8) ? 'annunciator-light annunciator-red-on' : 'annunciator-light';
+                annOil.className = (state.oilPressure < 20) ? 'annunciator-light annunciator-red-on' : 'annunciator-light';
+                annFuel.className = (state.fuelPressure < 2) ? 'annunciator-light annunciator-amber-on' : 'annunciator-light';
+                annAlt.className = (!state.alt || !state.engineRunning) ? 'annunciator-light annunciator-amber-on' : 'annunciator-light';
+            } else {
+                annVolts.className = annOil.className = annFuel.className = annAlt.className = 'annunciator-light';
+            }
+
+            // External Lights Feedback Visuals
+            const visBeacon = document.getElementById('vis-beacon');
+            const visStrobe = document.getElementById('vis-strobe');
+            const visNavL = document.getElementById('vis-nav-l');
+            const visNavR = document.getElementById('vis-nav-r');
+
+            if (state.master && state.beacon) {
+                visBeacon.className = 'w-5 h-5 rounded-full bg-red-600 beacon-pulse';
+            } else {
+                visBeacon.className = 'w-5 h-5 rounded-full bg-red-950 border border-red-900';
+            }
+
+            if (state.master && state.strobe) {
+                visStrobe.className = 'w-5 h-5 rounded-full bg-white strobe-flash';
+            } else {
+                visStrobe.className = 'w-5 h-5 rounded-full bg-slate-800 border border-slate-700';
+            }
+
+            if (state.master && state.nav) {
+                visNavL.className = 'w-4 h-4 rounded-full bg-red-500 shadow-[0_0_10px_#ef4444]';
+                visNavR.className = 'w-4 h-4 rounded-full bg-emerald-400 shadow-[0_0_10px_#34d399]';
+            } else {
+                visNavL.className = 'w-4 h-4 rounded-full bg-red-950';
+                visNavR.className = 'w-4 h-4 rounded-full bg-emerald-950';
+            }
+
+            updateChecklistUI();
+        }
+
+        /* ===================================================================
+           CHECKLIST & INSTRUCTION PROGRESSION
+           =================================================================== */
+        function updateChecklistUI() {
+            const steps = [
+                { id: 'chk-1', active: state.master },
+                { id: 'chk-2', active: state.master && state.alt },
+                { id: 'chk-3', active: state.master && state.beacon && state.nav },
+                { id: 'chk-4', active: state.master && state.fuelpump },
+                { id: 'chk-5', active: state.mixture > 50 },
+                { id: 'chk-6', active: state.throttle >= 5 && state.throttle <= 20 },
+                { id: 'chk-7', active: state.engineRunning }
+            ];
+
+            steps.forEach((s) => {
+                const el = document.getElementById(s.id);
+                if (s.active) {
+                    el.className = 'flex items-center gap-2 text-emerald-400 font-bold';
+                } else {
+                    el.className = 'flex items-center gap-2 text-slate-400 opacity-60';
+                }
+            });
+
+            const banner = document.getElementById('status-banner');
+            if (state.engineRunning) {
+                banner.innerText = "✓ MOTOR EM MARCHA LENTA (MOTOR LIGADO!)";
+                banner.className = "bg-emerald-950 border border-emerald-600 p-2 rounded text-center text-xs font-bold text-emerald-300 shadow-lg";
+            } else if (state.isCranking) {
+                banner.innerText = "⚡ DA-SE A PARTIDA (CRANKING)...";
+                banner.className = "bg-amber-950 border border-amber-500 p-2 rounded text-center text-xs font-bold text-amber-300 animate-pulse";
+            } else if (state.master) {
+                banner.innerText = "Bateria Conectada. Siga o Checklist!";
+                banner.className = "bg-slate-900 border border-slate-700 p-2 rounded text-center text-xs font-bold text-slate-200";
+            } else {
+                banner.innerText = "Aeronave Desligada. Ligue o Master!";
+                banner.className = "bg-slate-950 border border-slate-800 p-2 rounded text-center text-xs text-slate-500";
+            }
+        }
+
+        function resetSimulator() {
+            state.master = false;
+            state.alt = false;
+            state.fuelpump = false;
+            state.beacon = false;
+            state.strobe = false;
+            state.nav = false;
+            state.ignitionPos = 0;
+            state.isCranking = false;
+            state.throttle = 10;
+            state.mixture = 0;
+            state.engineRunning = false;
+            state.rpm = 0;
+
+            document.getElementById('sw-master').checked = false;
+            document.getElementById('sw-alt').checked = false;
+            document.getElementById('sw-fuelpump').checked = false;
+            document.getElementById('sw-beacon').checked = false;
+            document.getElementById('sw-strobe').checked = false;
+            document.getElementById('sw-nav').checked = false;
+            
+            document.getElementById('lever-throttle').value = 10;
+            document.getElementById('lever-mixture').value = 0;
+            
+            handleLeverChange('throttle');
+            handleLeverChange('mixture');
+            updateIgnitionKnobUI();
+        }
+
+        /* ===================================================================
+           CONTINUOUS ANIMATION & SOUND RENDER LOOP
+           =================================================================== */
+        function mainLoop() {
+            // Engine RPM Dynamics
+            if (state.engineRunning) {
+                const idleRpm = 850;
+                const maxRpm = 2700;
+                const mixtureFactor = (state.mixture / 100);
+                state.targetRpm = (idleRpm + (maxRpm - idleRpm) * (state.throttle / 100)) * mixtureFactor;
+            } else if (state.isCranking && state.master) {
+                state.targetRpm = 220 + Math.random() * 30; // Starter rotation ~250 RPM
+            } else {
+                state.targetRpm = 0;
+            }
+
+            // Smooth RPM interpolation
+            state.rpm += (state.targetRpm - state.rpm) * 0.12;
+
+            // Render Tachometer Needle (-120deg = 0, +120deg = 3000 RPM)
+            const rpmAngle = -120 + (state.rpm / 3000) * 240;
+            document.getElementById('needle-rpm').setAttribute('transform', `rotate(${rpmAngle} 100 100)`);
+            document.getElementById('digital-rpm').innerText = `${Math.round(state.rpm).toString().padStart(4, '0')} RPM`;
+
+            // Voltmeter Gauge (-60deg = 0V, +60deg = 16V)
+            const voltsAngle = -60 + (state.batteryVolts / 16) * 120;
+            document.getElementById('needle-volts').setAttribute('transform', `rotate(${voltsAngle} 100 100)`);
+            document.getElementById('digital-volts').innerText = `${state.batteryVolts.toFixed(1)} V`;
+
+            // Fuel Pressure Gauge (-40deg = 0, +40deg = 10 PSI)
+            const fuelPressAngle = -40 + (state.fuelPressure / 10) * 80;
+            document.getElementById('needle-fuelpress').setAttribute('transform', `rotate(${fuelPressAngle} 100 150)`);
+
+            // Engine Audio Synthesis Update
+            if (audioCtx && state.engineRunning) {
+                const baseFreq = 20 + (state.rpm / 2700) * 65;
+                const volume = 0.05 + (state.rpm / 2700) * 0.35;
+
+                engineOsc1.frequency.setTargetAtTime(baseFreq, audioCtx.currentTime, 0.05);
+                engineOsc2.frequency.setTargetAtTime(baseFreq * 0.5, audioCtx.currentTime, 0.05);
+                
+                engineGain.gain.setTargetAtTime(volume, audioCtx.currentTime, 0.05);
+                propNoiseGain.gain.setTargetAtTime(volume * 0.6, audioCtx.currentTime, 0.05);
+            } else if (audioCtx && !state.isCranking) {
+                engineGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.08);
+                propNoiseGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.08);
+            }
+
+            requestAnimationFrame(mainLoop);
+        }
+
+        // Launch Loop
+        requestAnimationFrame(mainLoop);
+        updateSimulatorLogic();
+    </script>
+</body>
+</html>
